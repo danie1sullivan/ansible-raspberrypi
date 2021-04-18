@@ -1,0 +1,93 @@
+---
+- name: Wireguard Role
+  block:
+    - name: Install
+      apt:
+        pkg:
+        - wireguard
+        - wireguard-tools
+        - wireguard-dkms
+
+    - name: Enable ipv4 Forwarding
+      lineinfile:
+        path: "/etc/sysctl.d/99-sysctl.conf"
+        regexp: "^#net.ipv4.ip_forward=1"
+        line: "net.ipv4.ip_forward=1"
+      notify: Apply sysctl
+
+    - name: Enable ipv6 Forwarding
+      lineinfile:
+        path: "/etc/sysctl.d/99-sysctl.conf"
+        regexp: "^#net.ipv6.conf.all.forwarding=1"
+        line: "net.ipv6.conf.all.forwarding=1"
+      notify: Apply sysctl
+
+    - name: Create Key Dir
+      file:
+        path: "/etc/wireguard/server.keys.d"
+        state: directory
+        mode: '0700'
+
+    - name: Check Server Pub File
+      stat:
+        path: "/etc/wireguard/server.keys.d/server.pub"
+      register: server_pub
+
+    - name: Create Server Key
+      shell: "umask 077 && wg genkey | tee server.key | wg pubkey > server.pub"
+      args:
+        chdir: "/etc/wireguard/server.keys.d"
+      when: not server_pub.stat.exists
+    
+    - name: Slurp Server Key Value
+      slurp:
+        src: "/etc/wireguard/server.keys.d/server.key"
+      register: server_key_value
+
+    - name: Peers
+      block:
+        - name: Create Server Peers File
+          file:
+            path: "/etc/wireguard/wg0-peers.txt"
+            state: touch
+            mode: '0600'
+            modification_time: preserve
+            access_time: preserve
+
+        - include_tasks: peers_server.yml
+          loop: "{{ wg_peers }}"
+        
+        - name: Create Conf Dir
+          file:
+            path: /etc/wireguard/client.conf.d
+            state: directory
+            mode: '0700'
+
+        - include_tasks: peers_client.yml
+          loop: "{{ wg_peers }}"
+      tags:
+        - peers
+
+    - name: Slurp Peers File
+      slurp:
+        src: "/etc/wireguard/wg0-peers.txt"
+      register: peers_file
+
+    - name: Create Config
+      template:
+        src: wg0.conf.j2
+        dest: /etc/wireguard/wg0.conf
+      notify: Restart wg0
+
+    - name: Mullvad
+      block:
+        - include_tasks: mullvad.yml
+      when: wg_mullvad_enable
+      tags:
+        - mullvad
+
+  become: true
+  become_user: root
+  when: wg_enable
+  tags:
+    - wireguard

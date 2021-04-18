@@ -1,0 +1,26 @@
+[Interface]
+Address = {{ wg_listen_ipv4 }}, {{ wg_listen_ipv6 }}
+ListenPort = {{ wg_listen_port }}
+FwMark = {{ wg_fwmark }}
+PrivateKey = {{ server_key_value.content | b64decode -}}
+
+{% if wg_mullvad_enable %}
+# Forward wg0 to {{ wg_listen_interface }}
+PostUp = iptables -A FORWARD -i %i -o {{ wg_listen_interface }} -m state --state RELATED,ESTABLISHED -j ACCEPT && ip6tables -A FORWARD -i %i -o {{ wg_listen_interface }} -m state --state RELATED,ESTABLISHED -j ACCEPT
+PostUp = iptables -A FORWARD -i {{ wg_listen_interface }} -o %i -j ACCEPT && ip6tables -A FORWARD -i {{ wg_listen_interface }} -o %i -j ACCEPT
+PreDown = iptables -D FORWARD -i %i -o {{ wg_listen_interface }} -m state --state RELATED,ESTABLISHED -j ACCEPT && ip6tables -D FORWARD -i %i -o {{ wg_listen_interface }} -m state --state RELATED,ESTABLISHED -j ACCEPT
+PreDown = iptables -D FORWARD -i {{ wg_listen_interface }} -o %i -j ACCEPT && ip6tables -D FORWARD -i {{ wg_listen_interface }} -o %i -j ACCEPT
+
+# Forwad wg0 to mullvad
+PostUp = iptables -A FORWARD -i %i -o {{ wg_mullvad_interface }} -m state --state RELATED,ESTABLISHED -j ACCEPT && ip6tables -A FORWARD -i %i -o {{ wg_mullvad_interface }} -m state --state RELATED,ESTABLISHED -j ACCEPT
+PostUp = iptables -A FORWARD -i {{ wg_mullvad_interface }} -o %i -j ACCEPT && ip6tables -A FORWARD -i {{ wg_mullvad_interface }} -o %i -j ACCEPT
+PostUp = iptables -t nat -A POSTROUTING -o %i -j MASQUERADE && ip6tables -t nat -A POSTROUTING -o %i -j MASQUERADE
+PreDown = iptables -D FORWARD -i %i -o {{ wg_mullvad_interface }} -m state --state RELATED,ESTABLISHED -j ACCEPT && ip6tables -D FORWARD -i %i -o {{ wg_mullvad_interface }} -m state --state RELATED,ESTABLISHED -j ACCEPT
+PreDown = iptables -D FORWARD -i {{ wg_mullvad_interface }} -o %i -j ACCEPT && ip6tables -D FORWARD -i {{ wg_mullvad_interface }} -o %i -j ACCEPT PreDown = iptables -t nat -D POSTROUTING -o %i -j MASQUERADE && ip6tables -t nat -D POSTROUTING -o %i -j MASQUERADE
+
+{% else %}
+PostUp = iptables -w -t nat -A POSTROUTING -o {{ wg_listen_interface }} -j MASQUERADE; ip6tables -w -t nat -A POSTROUTING -o {{ wg_listen_interface }} -j MASQUERADE
+PostDown = iptables -w -t nat -D POSTROUTING -o {{ wg_listen_interface }} -j MASQUERADE; ip6tables -w -t nat -D POSTROUTING -o {{ wg_listen_interface }} -j MASQUERADE
+{% endif %}
+
+{{ peers_file.content | b64decode }}

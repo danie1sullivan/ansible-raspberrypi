@@ -1,0 +1,9 @@
+---
+- hosts: raspberrypi
+  roles:
+  - sshd
+  - dnscrypt
+  - pihole
+  - wireguard
+  vars_files:
+    - vars.yml

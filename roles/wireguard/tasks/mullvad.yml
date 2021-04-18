@@ -1,0 +1,65 @@
+---
+- name: Check Config
+  stat:
+    path: "/etc/wireguard/{{ wg_mullvad_interface }}.conf"
+  register: check
+
+- name: Copy Config
+  copy:
+    src: "{{ wg_mullvad_conf }}"
+    dest: "/etc/wireguard/{{ wg_mullvad_interface }}.conf"
+    mode: 0600
+  register: config
+  when: not check.stat.exists
+
+- name: Add FwMark
+  lineinfile:
+    path: "/etc/wireguard/{{ wg_mullvad_interface }}.conf"
+    regexp: '^FwMark'
+    insertbefore: '^DNS ='
+    line: "FwMark = {{ wg_fwmark }}"
+  notify: "Restart {{ wg_mullvad_interface }}"
+
+- name: Set DNS
+  lineinfile:
+    path: "/etc/wireguard/{{ wg_mullvad_interface }}.conf"
+    regexp: '^DNS'
+    line: "DNS = {{ wg_mullvad_dns_server }}"
+  notify: "Restart {{ wg_mullvad_interface }}"
+
+- name: Add Routing
+  blockinfile:
+    dest: "/etc/wireguard/{{ wg_mullvad_interface }}.conf"
+    insertafter: "^DNS ="
+    block: |
+      
+      #Kill switch, the policy is set to DROP on boot
+      #PostUp = iptables -P FORWARD ACCEPT && ip6tables -P FORWARD ACCEPT
+
+      #For allowing traffic through the vpn
+      PostUp  = iptables -t mangle -A OUTPUT -d {{ wg_mullvad_cidr }},{{ wg_listen_ipv4_cidr }},{{ wg_local_cidr }} -j MARK --set-mark $(wg show %i fwmark)
+      PostUp  = ip6tables -t mangle -A OUTPUT -d fc00::/7 -j MARK --set-mark $(wg show %i fwmark)
+      PreDown = iptables -t mangle -D OUTPUT -d {{ wg_mullvad_cidr }},{{ wg_listen_ipv4_cidr }},{{ wg_local_cidr }} -j MARK --set-mark $(wg show %i fwmark)
+      PreDown = ip6tables -t mangle -D OUTPUT -d fc00::/7 -j MARK --set-mark $(wg show %i fwmark)
+      
+      #Forwarding Mullad interface to wg0
+      PostUp  =  iptables -A FORWARD -i %i -o wg0 -m state --state RELATED,ESTABLISHED -j ACCEPT && ip6tables -A FORWARD -i %i -o wg0 -m state --state RELATED,ESTABLISHED -j ACCEPT
+      PostUp  =  iptables -A FORWARD -i wg0 -o %i -j ACCEPT &&  ip6tables -A FORWARD -i wg0 -o %i -j ACCEPT
+      PostUp  =  iptables -t nat -A POSTROUTING -o %i -j MASQUERADE && ip6tables -t nat -A POSTROUTING -o %i -j MASQUERADE
+      PreDown =  iptables -D FORWARD -i %i -o wg0 -m state --state RELATED,ESTABLISHED -j ACCEPT && ip6tables -D FORWARD -i %i -o wg0 -m state --state RELATED,ESTABLISHED -j ACCEPT
+      PreDown =  iptables -D FORWARD -i wg0 -o %i -j ACCEPT && ip6tables -D FORWARD -i wg0 -o %i -j ACCEPT
+      PreDown =  iptables -t nat -D POSTROUTING -o %i -j MASQUERADE && ip6tables -t nat -D POSTROUTING -o %i -j MASQUERADE
+      
+      #Forwarding Mullvad inteface to {{ wg_listen_interface }}
+      PostUp  =  iptables -A FORWARD -i %i -o {{ wg_listen_interface }} -m state --state RELATED,ESTABLISHED -j ACCEPT && ip6tables -A FORWARD -i %i -o {{ wg_listen_interface }} -m state --state RELATED,ESTABLISHED -j ACCEPT
+      PostUp  =  iptables -A FORWARD -i {{ wg_listen_interface }} -o %i -j ACCEPT && ip6tables -A FORWARD -i {{ wg_listen_interface }} -o %i -j ACCEPT
+      PreDown =  iptables -D FORWARD -i %i -o {{ wg_listen_interface }} -m state --state RELATED,ESTABLISHED -j ACCEPT && ip6tables -D FORWARD -i %i -o {{ wg_listen_interface }} -m state --state RELATED,ESTABLISHED -j ACCEPT
+      PreDown =  iptables -D FORWARD -i {{ wg_listen_interface }} -o %i -j ACCEPT && ip6tables -D FORWARD -i {{ wg_listen_interface }} -o %i -j ACCEPT
+      
+      #Mullvad killswitch, too keep the packages within the tunnel
+      #PostUp  =  iptables -I OUTPUT ! -o %i -m mark ! --mark $(wg show %i fwmark) -m addrtype ! --dst-type LOCAL -j REJECT && ip6tables -I OUTPUT ! -o %i -m mark ! --mark $(wg show %i fwmark) -m addrtype ! --dst-type LOCAL -j REJECT
+      #PreDown = iptables -D OUTPUT ! -o %i -m mark ! --mark $(wg show  %i fwmark) -m addrtype ! --dst-type LOCAL -j REJECT && ip6tables -D OUTPUT ! -o %i -m mark ! --mark $(wg show  %i fwmark) -m addrtype ! --dst-type LOCAL -j REJECT
+
+      #Sets DROP again if interface goes down goes down.
+      #PreDown = iptables -P FORWARD DROP && ip6tables -P FORWARD DROP
+  notify: "Restart {{ wg_mullvad_interface }}"

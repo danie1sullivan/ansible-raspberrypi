@@ -1,0 +1,5 @@
+---
+- name: Configure pihole
+  command: bash /opt/basic-install.sh --unattended
+  become: true
+  become_user: root

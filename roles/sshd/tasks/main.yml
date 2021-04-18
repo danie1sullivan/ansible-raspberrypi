@@ -1,0 +1,17 @@
+---
+- name: SSHD Role
+  block:
+    - name: Configure
+      copy:
+        src: "{{ role_path }}/files/sshd_config"
+        dest: /etc/ssh/sshd_config
+        owner: root
+        group: root
+        mode: '0544'
+        backup: yes
+      notify: Restart sshd
+      
+  become: true
+  become_user: root
+  tags:
+    - sshd

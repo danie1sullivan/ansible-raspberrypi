@@ -1,0 +1,26 @@
+WEBPASSWORD={{ pi_webpassword_hash.content | b64decode -}}
+BLOCKING_ENABLED=true
+DNSMASQ_LISTENING=local
+DNS_FQDN_REQUIRED=true
+DNS_BOGUS_PRIV=true
+DNSSEC={{ pi_dnssec }}
+REV_SERVER=false
+{% if dnscrypt_enable %}
+PIHOLE_DNS_3=::1#{{ dnscrypt_port }}
+PIHOLE_DNS_4=::1#{{ dnscrypt_port }}
+{% endif %}
+PIHOLE_INTERFACE={{ pi_interface }}
+IPV4_ADDRESS={{ pi_ipv4_addr }}
+IPV6_ADDRESS={{ pi_ipv6_addr }}
+{% if dnscrypt_enable %}
+PIHOLE_DNS_1=127.0.0.1#{{ dnscrypt_port }}
+PIHOLE_DNS_2=127.0.0.1#{{ dnscrypt_port }}
+{% else %}
+PIHOLE_DNS_1={{ fallback_ipv4_dns1 }}
+PIHOLE_DNS_2={{ fallback_ipv4_dns2 }}
+{% endif %}
+QUERY_LOGGING={{ pi_query_logging }}
+INSTALL_WEB_SERVER=true
+INSTALL_WEB_INTERFACE=true
+LIGHTTPD_ENABLED=true
+CACHE_SIZE={{ pi_cache_size }}

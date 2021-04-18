@@ -1,0 +1,21 @@
+---
+- name: Slurp Key Value
+  slurp:
+    src: "/etc/wireguard/client.keys.d/{{ item.name }}.key"
+  register: peer_key_value
+
+- name: Slurp Server Pub Value
+  slurp:
+    src: "/etc/wireguard/server.keys.d/server.pub"
+  register: server_pub_value
+
+- name: Slurp PSK Value
+  slurp:
+    src: "/etc/wireguard/client.keys.d/{{ item.name }}.psk"
+  register: peer_psk_value  
+
+- name: Add Peer
+  template:
+    src: client.conf.j2
+    dest: "/etc/wireguard/client.conf.d/{{ item.name }}.conf"
+    mode: '0600'

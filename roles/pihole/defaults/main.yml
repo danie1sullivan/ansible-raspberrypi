@@ -1,0 +1,8 @@
+---
+pi_webpassword: ""
+pi_interface: "{{ net_interface }}"
+pi_dnssec: "false"
+pi_cache_size: 10000
+pi_query_logging: "false"
+pi_ipv4_addr: ""
+pi_ipv6_addr: ""

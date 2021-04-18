@@ -1,0 +1,62 @@
+---
+- name: Dnscrypt Role
+  block:
+    - name: Check Installed File
+      stat:
+        path: /opt/dnscrypt.installed
+      register: canary
+
+    - name: Install dnscrypt-proxy
+      block:
+        - name: Download Tar
+          get_url:
+            url: "https://github.com/DNSCrypt/dnscrypt-proxy/releases/download/{{ dnscrypt_version }}/dnscrypt-proxy-linux_arm-{{ dnscrypt_version }}.tar.gz"
+            dest: /opt/dnscrypt.tar.gz
+
+        - name: Download Tar Minisig
+          get_url:
+            url: "https://github.com/DNSCrypt/dnscrypt-proxy/releases/download/{{ dnscrypt_version }}/dnscrypt-proxy-linux_arm-{{ dnscrypt_version }}.tar.gz.minisig"
+            dest: /opt/dnscrypt.tar.gz.minisig
+        
+        - name: Create Dest Dir
+          file:
+            path: "{{ dnscrypt_dir }}"
+            state: directory
+        
+        - name: Extract Tar
+          unarchive:
+            src: /opt/dnscrypt.tar.gz
+            dest: "{{ dnscrypt_dir }}"
+            extra_opts: [--strip-components=1]
+            remote_src: yes
+            
+        - name: Remove Tar
+          file:
+            path: "{{ item }}"
+            state: absent
+          with_items:
+            - /opt/dnscrypt.tar.gz
+            - /opt/dnscrypt.tar.gz.minisig
+    
+        - name: Install
+          command: "{{ dnscrypt_dir }}/dnscrypt-proxy -service install"
+
+        - name: Create Installed File
+          copy:
+            content: ""
+            dest: /opt/dnscrypt.installed
+
+      when: not canary.stat.exists
+
+    - name: Create Config
+      template:
+        src: dnscrypt-proxy.toml.j2
+        dest: "{{ dnscrypt_dir }}/dnscrypt-proxy.toml"
+        validate: "{{ dnscrypt_dir }}/dnscrypt-proxy -check -config %s"
+      notify: Restart dnscrypt-proxy
+
+  become: true
+  become_user: root
+  when: dnscrypt_enable
+  tags:
+    - dnscrypt

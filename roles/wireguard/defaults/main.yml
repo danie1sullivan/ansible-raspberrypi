@@ -1,0 +1,18 @@
+---
+wg_listen_endpoint: ""
+wg_local_cidr: ""
+wg_mullvad_interface: ""
+wg_mullvad_conf: ""
+
+wg_enable: true
+wg_fwmark: 51820
+
+wg_listen_port: 47111
+wg_listen_ipv4_cidr: "10.100.0.0/24"
+wg_listen_ipv4: "10.100.0.1/24"
+wg_listen_ipv6: "fd08:4711::1/64"
+wg_listen_interface: "{{ net_interface }}"
+
+wg_mullvad_enable: true
+wg_mullvad_cidr: "10.64.0.0/24"
+wg_mullvad_dns_server: "127.0.0.1"

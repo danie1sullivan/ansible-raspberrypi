@@ -1,0 +1,11 @@
+ChallengeResponseAuthentication no
+UsePAM yes
+X11Forwarding no
+PrintMotd no
+AcceptEnv LANG LC_*
+Subsystem	sftp	/usr/lib/openssh/sftp-server
+PermitRootLogin no
+PermitEmptyPasswords no
+PubkeyAuthentication yes
+PasswordAuthentication no
+Protocol 2

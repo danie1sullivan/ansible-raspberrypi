@@ -1,0 +1,11 @@
+[Interface]
+Address = {{ item.ipv4 }}, {{ item.ipv6 }}
+DNS = 10.100.0.1
+PrivateKey = {{ peer_key_value.content | b64decode -}}
+
+[Peer]
+AllowedIPs = 0.0.0.0/0, ::/0
+Endpoint = {{ wg_listen_endpoint }}:{{ wg_listen_port }}
+PersistentKeepalive = 25
+PublicKey = {{ server_pub_value.content | b64decode -}}
+PresharedKey = {{ peer_psk_value.content | b64decode }}

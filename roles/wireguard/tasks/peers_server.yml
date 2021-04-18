@@ -1,0 +1,50 @@
+---
+- name: Create Key Dir
+  file:
+    path: /etc/wireguard/client.keys.d
+    state: directory
+    mode: '0700'
+
+- name: Check Key File
+  stat:
+    path: "/etc/wireguard/client.keys.d/{{ item.name }}.pub"
+  register: peer_pub
+
+- name: Create Peer Key
+  shell: "umask 077 && wg genkey | tee {{ item.name }}.key | wg pubkey > {{ item.name }}.pub"
+  args:
+    chdir: "/etc/wireguard/client.keys.d"
+  when: not peer_pub.stat.exists
+
+- name: Check PSK File
+  stat:
+    path: "/etc/wireguard/client.keys.d/{{ item.name }}.psk"
+  register: peer_psk
+
+- name: Create Peer PSK
+  shell: "umask 077 && wg genpsk > {{ item.name }}.psk"
+  args:
+    chdir: "/etc/wireguard/client.keys.d"
+  when: not peer_psk.stat.exists
+
+- name: Slurp Pub Value
+  slurp:
+    src: "/etc/wireguard/client.keys.d/{{ item.name }}.pub"
+  register: peer_pub_value
+
+- name: Slurp PSK Value
+  slurp:
+    src: "/etc/wireguard/client.keys.d/{{ item.name }}.psk"
+  register: peer_psk_value  
+
+- name: Add Peer
+  blockinfile:
+    path: /etc/wireguard/wg0-peers.txt
+    insertafter: EOF
+    marker_begin: "BEGIN {{ item.name }}"
+    marker_end: "END {{ item.name }}"
+    block: |
+      [Peer]
+      PublicKey = {{ peer_pub_value.content | b64decode -}}
+      PresharedKey = {{ peer_psk_value.content | b64decode -}}
+      AllowedIPs = {{ item.ipv4 }}, {{ item.ipv6 }}

@@ -1,0 +1,8 @@
+---
+- name: Restart dnscrypt-proxy
+  systemd:
+    name: dnscrypt-proxy
+    state: restarted
+    enabled: yes
+  become: true
+  become_user: root
